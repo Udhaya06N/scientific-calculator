@@ -210,6 +210,24 @@ function App() {
   const handleKeyPress = (event) => {
     const { key } = event;
 
+    const functionMap = {
+      t: "tan(",
+      s: "sin(",
+      c: "cos(",
+      l: "ln(",
+      g: "log(",
+      r: "√(",
+      p: "π",
+      e: "e",
+      x: "x!",
+      z: "e**",
+    };
+
+    if (functionMap[key]) {
+      handleButtonClick(functionMap[key]);
+      return;
+    }
+
     switch (event.key) {
       case "Backspace":
         event.preventDefault();
