@@ -1,38 +1,92 @@
-.App {
-  text-align: center;
-}
-
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+.calculator-container{
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  margin-top: 50px;
 }
 
-.App-link {
-  color: #61dafb;
+.search-container{
+  position: relative;
+  width: 500px; 
+  margin: auto;
+  margin-top: 13vh;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.search-icon {
+  position: absolute;
+  left: 15px;
+  font-size: 20px;
+  top: 40%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  cursor: pointer;
 }
+
+.search-input{
+  width: 100%;
+  height: 80px;
+  border: 1px solid black;
+  border-radius: 5px;
+  padding-left: 40px; 
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.buttons{
+  width: auto;
+  height: fit-content;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.button-inactive {
+  color: #888;
+}
+
+.calc-inputs button{
+  display: contents;
+}
+
+.calculator-container .Calc-inputs button {
+  width: 65px;
+  margin: 4px;
+  border-radius: 5px;
+  padding: 10px 10px;
+  font-size: 16px;
+  border: none;
+}
+
+.power-input-box {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  transform: translateX(-50%);
+}
+
+.history-box {
+  position: absolute;
+  top: 150px;
+  width: 300px;
+  max-height: auto;
+  background-color: white;
+  border: 1px solid #ccc;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+  border-radius: 5px;
+  padding: 10px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.history-box ul {
+  list-style-type: none;
+  padding: 10px;
+  margin: 0;
+}
+
+.history-box li {
+  margin-bottom: 5px;
+  font-size: 16px;
+  padding: 10px;
+}
+
+
