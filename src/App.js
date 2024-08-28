@@ -2,7 +2,7 @@ import { PiClockCounterClockwise } from "react-icons/pi";
 import "./App.css";
 import { useEffect, useRef, useState } from "react";
 import { CalcButtons } from "./CalcButtons";
-import { replaceExpression } from "./ExpressionParser";
+import { getButtonClassName, replaceExpression } from "./ExpressionParser";
 
 function App() {
   const [inputValue, setInputValue] = useState("0");
@@ -14,29 +14,37 @@ function App() {
   const [isInverseMode, setIsInverseMode] = useState(false);
   const [previousInput, setPreviousInput] = useState("");
   const [previousResult, setPreviousResult] = useState("");
+  const [isInvButtonClicked, setIsInvButtonClicked] = useState(false);
 
   const historyRef = useRef(null);
 
-  const handleFactorial = (prevValue) => {
-    const factorial = (n) => {
-      if (n < 0) return "Error";
-      let result = 1;
-      for (let i = 1; i <= n; i++) {
-        result *= i;
-      }
-      return result;
-    };
+  const handleFactorial = (n) => {
+    if (n === 0 || n === 1) return 1;
 
-    return prevValue.replace(/(\d+)!/g, (num) => factorial(parseInt(num, 10)));
+    let result = 1;
+    for (let i = 2; i <= n; i++) {
+      result *= i;
+    }
+    return result;
   };
 
   const handleExpression = (expression) => {
     try {
-      expression = expression.replace(/(\d+)!/g, (num) => {
-        return handleFactorial(parseInt(num, 10));
+      let openBrackets = (expression.match(/\(/g) || []).length;
+      let closeBrackets = (expression.match(/\)/g) || []).length;
+      let bracketsToAdd = openBrackets - closeBrackets;
+
+      if (bracketsToAdd > 0) {
+        expression += ")".repeat(bracketsToAdd);
+      }
+
+      expression = expression.replace(/√/g, "Math.pow(x, 1/2)");
+
+      expression = expression.replace(/(\d+)!/g, (match, num) => {
+        const factorialResult = handleFactorial(parseInt(num, match));
+        return factorialResult;
       });
 
-      // eslint-disable-next-line no-eval
       const result = eval(expression);
 
       setPreviousResult(result.toString());
@@ -61,6 +69,16 @@ function App() {
       setIsAllClearMode(false);
       return;
     }
+    const randomValue = Math.random();
+    const lastDigit = inputValue.slice(-1);
+    const lastChar = inputValue.slice(-1);
+
+    let expression = replaceExpression(inputValue, isRadians, previousInput);
+
+    const isLastCharacterOperatorOrDecimal = () => {
+      const lastChar = inputValue.slice(-1);
+      return ["+", "-", "*", "/", "."].includes(lastChar);
+    };
 
     switch (buttonText) {
       case "Rad":
@@ -71,6 +89,7 @@ function App() {
         break;
       case "Inv":
         setIsInverseMode(!isInverseMode);
+        setIsInvButtonClicked(!isInvButtonClicked);
         return;
       case "CE":
         setInputValue((prevValue) =>
@@ -96,7 +115,6 @@ function App() {
       case ")":
         if (openBracketsCount > 0) {
           setInputValue((prevValue) => prevValue + buttonText);
-          setOpenBracketsCount((prevCount) => prevCount - 1);
         }
         break;
       case "sin":
@@ -126,8 +144,15 @@ function App() {
         break;
       case "÷":
       case "×":
-        const lastChar = inputValue.slice(-1);
         if (lastChar === "÷" || lastChar === "×") {
+          setInputValue((prevValue) => prevValue.slice(0, -1) + buttonText);
+        } else {
+          setInputValue((prevValue) => prevValue + buttonText);
+        }
+        break;
+      case "+":
+      case "-":
+        if (lastChar === "+" || lastChar === "-") {
           setInputValue((prevValue) => prevValue.slice(0, -1) + buttonText);
         } else {
           setInputValue((prevValue) => prevValue + buttonText);
@@ -167,16 +192,12 @@ function App() {
         });
         break;
       case "y√x":
-        setPreviousInput(inputValue);
-        setInputValue((prevValue) => prevValue + "√");
-        setIsAllClearMode(false);
+        setInputValue("√");
         break;
       case "Rnd":
-        const randomValue = Math.random();
         setInputValue(randomValue.toString());
         break;
       case "EXP":
-        const lastDigit = inputValue.slice(-1);
         if (!isNaN(lastDigit) || lastDigit === "e") {
           setInputValue((prevValue) => prevValue);
         }
@@ -188,14 +209,15 @@ function App() {
         setIsAllClearMode(false);
         break;
       case "=":
-        let expression = replaceExpression(
-          inputValue,
-          isRadians,
-          previousInput
-        );
         handleExpression(expression);
         break;
       default:
+        if (["+", "-", "*", "/", "."].includes(buttonText)) {
+          if (isLastCharacterOperatorOrDecimal()) {
+            return;
+          }
+        }
+
         if (inputValue === "0" && !isNaN(buttonText)) {
           setInputValue(buttonText);
         } else {
@@ -296,29 +318,45 @@ function App() {
   return (
     <div className="calculator-container">
       <div className="search-container">
-        <PiClockCounterClockwise
-          onClick={handleIconClick}
-          style={{ fontSize: "25px" }}
-        />
-        <textarea
-          className="search-input"
-          value={`${previousInput ? previousInput + "\n" : ""}${inputValue}`}
-          onChange={handleSearchChange}
-          readOnly
-        />
+        <div className="textarea-container" style={{ position: "relative" }}>
+          <textarea
+            className="search-input"
+            value={inputValue}
+            onChange={handleSearchChange}
+            readOnly
+          />
+          <PiClockCounterClockwise
+            className="search-icon"
+            onClick={handleIconClick}
+            style={{ fontSize: "22px", zIndex: 1000 }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: "10px",
+              right: 12,
+              color: "gray",
+              fontSize: "13px",
+              whiteSpace: "pre-wrap",
+              wordWrap: "break-word",
+              pointerEvents: "none",
+              zIndex: "0",
+            }}
+          >
+            {previousInput ? previousInput + "\n" : ""}
+          </div>
+        </div>
       </div>
       <div className="buttons">
         {buttons.map((row, rowIndex) => (
           <div key={rowIndex} className="Calc-inputs">
             {row.map((buttonText, buttonIndex) => (
               <button
-                className={
-                  buttonText === "Rad" && !isRadians
-                    ? "button-inactive"
-                    : buttonText === "Deg" && isRadians
-                    ? "button-inactive"
-                    : ""
-                }
+                className={getButtonClassName(
+                  buttonText,
+                  isRadians,
+                  isInvButtonClicked
+                )}
                 key={buttonIndex}
                 onClick={() => handleButtonClick(buttonText)}
               >
@@ -330,7 +368,13 @@ function App() {
       </div>
       {showHistory && (
         <div ref={historyRef} className="history-box">
-          <ul>
+          <PiClockCounterClockwise
+            className="history-icon"
+            onClick={handleIconClick}
+            style={{ fontSize: "22px" }}
+          />
+          <div className="history-line"></div>
+          <ul className="history-lists">
             {history.map((entry, index) => (
               <li key={index}>{entry}</li>
             ))}
