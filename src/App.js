@@ -38,15 +38,6 @@ function App() {
     return expression.replace(/Ans/g, ans);
   };
 
-  const replacePowerStack = (expression) => {
-    let updatedExpression = expression;
-    for (let i = powerStack.length - 1; i >= 0; i--) {
-      const power = powerStack[i];
-      updatedExpression = `Math.pow(${updatedExpression}, ${power})`;
-    }
-    return updatedExpression;
-  };
-
   const handleExpression = (expression) => {
     try {
       let openBrackets = (expression.match(/\(/g) || []).length;
@@ -56,8 +47,6 @@ function App() {
       if (bracketsToAdd > 0) {
         expression += ")".repeat(bracketsToAdd);
       }
-
-      expression = replacePowerStack(expression);
 
       expression = expression.replace(
         /(\d+(\.\d+)?)E(\d+)/g,
@@ -72,6 +61,10 @@ function App() {
           return base;
         }
       );
+
+      if (placeholderValue !== "") {
+        expression = `Math.pow(${placeholderValue}, ${expression})`;
+      }
 
       expression = replaceAnsInExpression(expression, storedAns);
       expression = expression.replace(/√/g, "Math.pow(x, 1/2)");
@@ -97,7 +90,9 @@ function App() {
         `${inputValue} = ${result}`,
       ]);
 
+      setPowerStack([]);
       setPlaceholderValue("");
+      setIsPowerBoxVisible(false);
       setIsAllClearMode(true);
       setIsInverseMode(false);
       setIsInvButtonClicked(false);
