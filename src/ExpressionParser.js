@@ -33,18 +33,21 @@ export const getButtonClassName = (
   isRadians,
   isInvButtonClicked
 ) => {
-  if (buttonText === "Rad" && !isRadians) {
-    return "button-inactive";
+  if (buttonText === "Rad") {
+    return !isRadians ? "button-inactive rad" : "button-active rad";
   }
-  if (buttonText === "Deg" && isRadians) {
-    return "button-inactive";
+  if (buttonText === "Deg") {
+    return isRadians ? "button-inactive deg" : "button-active deg";
   }
+
   if (buttonText === "=") {
     return "button-equal";
   }
+
   if (/^[7896541230.]+$/.test(buttonText)) {
     return "button-special";
   }
+
   const baseClass = `CalcButton`;
   if (buttonText === "Inv") {
     return isInvButtonClicked ? `${baseClass} InvActive` : baseClass;

@@ -15,8 +15,14 @@ function App() {
   const [previousInput, setPreviousInput] = useState("");
   const [previousResult, setPreviousResult] = useState("");
   const [isInvButtonClicked, setIsInvButtonClicked] = useState(false);
+  const [storedAns, setStoredAns] = useState("");
+  const [isPowerBoxVisible, setIsPowerBoxVisible] = useState(false);
+  const [placeholderValue, setPlaceholderValue] = useState("");
+  const [powerStack, setPowerStack] = useState([]);
 
   const historyRef = useRef(null);
+
+  const maxPowerLimit = 4;
 
   const handleFactorial = (n) => {
     if (n === 0 || n === 1) return 1;
@@ -26,6 +32,19 @@ function App() {
       result *= i;
     }
     return result;
+  };
+
+  const replaceAnsInExpression = (expression, ans) => {
+    return expression.replace(/Ans/g, ans);
+  };
+
+  const replacePowerStack = (expression) => {
+    let updatedExpression = expression;
+    for (let i = powerStack.length - 1; i >= 0; i--) {
+      const power = powerStack[i];
+      updatedExpression = `Math.pow(${updatedExpression}, ${power})`;
+    }
+    return updatedExpression;
   };
 
   const handleExpression = (expression) => {
@@ -38,6 +57,23 @@ function App() {
         expression += ")".repeat(bracketsToAdd);
       }
 
+      expression = replacePowerStack(expression);
+
+      expression = expression.replace(
+        /(\d+(\.\d+)?)E(\d+)/g,
+        (match, base, decimal, exponent) => {
+          return `${base}e${exponent}`;
+        }
+      );
+
+      expression = expression.replace(
+        /(\d+(\.\d+)?)E(?![\d])/g,
+        (match, base) => {
+          return base;
+        }
+      );
+
+      expression = replaceAnsInExpression(expression, storedAns);
       expression = expression.replace(/√/g, "Math.pow(x, 1/2)");
 
       expression = expression.replace(/(\d+)!/g, (match, num) => {
@@ -47,28 +83,31 @@ function App() {
 
       const result = eval(expression);
 
+      setStoredAns(result.toString());
+
+      setIsPowerBoxVisible(false);
+
       setPreviousResult(result.toString());
       setPreviousInput(`${inputValue} = ${result}`);
 
       setInputValue(result.toString());
+
       setHistory((prevHistory) => [
         ...prevHistory,
         `${inputValue} = ${result}`,
       ]);
 
+      setPlaceholderValue("");
       setIsAllClearMode(true);
       setIsInverseMode(false);
+      setIsInvButtonClicked(false);
     } catch (error) {
       setInputValue("Error");
+      setIsAllClearMode(true);
     }
   };
 
   const handleButtonClick = (buttonText) => {
-    if (inputValue === "Error" && buttonText !== "CE" && buttonText !== "AC") {
-      setInputValue(buttonText);
-      setIsAllClearMode(false);
-      return;
-    }
     const randomValue = Math.random();
     const lastDigit = inputValue.slice(-1);
     const lastChar = inputValue.slice(-1);
@@ -96,14 +135,27 @@ function App() {
           prevValue.length > 1 ? prevValue.slice(0, -1) : "0"
         );
         setIsAllClearMode(false);
+        setIsPowerBoxVisible(false);
         break;
       case "AC":
         setInputValue("0");
+        setPowerStack([]);
+        setPlaceholderValue("");
+        setIsPowerBoxVisible(false);
         setIsAllClearMode(true);
         break;
       case "Ans":
-        if (previousResult) {
-          setInputValue(previousResult);
+        if (storedAns) {
+          if (inputValue === "0") {
+            setInputValue("Ans");
+          } else if (/\d|\)|!/.test(lastChar)) {
+            setInputValue((prevValue) => prevValue + "*Ans");
+          } else if (inputValue.endsWith("Ans")) {
+            setInputValue((prevValue) => prevValue);
+          } else {
+            setInputValue((prevValue) => prevValue + "Ans");
+          }
+
           setIsAllClearMode(false);
           setIsInverseMode(false);
         }
@@ -132,6 +184,7 @@ function App() {
             : prevValue + "*" + buttonText + "("
         );
         setOpenBracketsCount(openBracketsCount + 1);
+        setIsInvButtonClicked(false);
         break;
       case "π":
       case "e":
@@ -159,7 +212,11 @@ function App() {
         }
         break;
       case "xy":
-        setInputValue((prevValue) => prevValue + "**");
+        if (powerStack.length < maxPowerLimit) {
+          setPowerStack([...powerStack, placeholderValue || ""]);
+          setIsPowerBoxVisible(true);
+          setPlaceholderValue("");
+        }
         break;
       case "x2":
         setInputValue((prevValue) => {
@@ -198,8 +255,8 @@ function App() {
         setInputValue(randomValue.toString());
         break;
       case "EXP":
-        if (!isNaN(lastDigit) || lastDigit === "e") {
-          setInputValue((prevValue) => prevValue);
+        if (!isNaN(lastDigit)) {
+          setInputValue((prevValue) => prevValue + "E");
         }
         break;
       case "ex":
@@ -211,6 +268,7 @@ function App() {
       case "=":
         handleExpression(expression);
         break;
+
       default:
         if (["+", "-", "*", "/", "."].includes(buttonText)) {
           if (isLastCharacterOperatorOrDecimal()) {
@@ -218,12 +276,20 @@ function App() {
           }
         }
 
-        if (inputValue === "0" && !isNaN(buttonText)) {
+        if (inputValue.endsWith("Ans")) {
+          setInputValue((prevValue) => prevValue + "*");
+        }
+
+        if (isPowerBoxVisible) {
+          setPlaceholderValue((prevValue) => prevValue + buttonText);
+        } else if (inputValue === "0" && !isNaN(buttonText)) {
           setInputValue(buttonText);
+          setIsInvButtonClicked(false);
         } else {
           setInputValue((prevValue) => prevValue + buttonText);
           setIsAllClearMode(false);
           setIsInverseMode(false);
+          setIsInvButtonClicked(false);
           break;
         }
     }
@@ -262,14 +328,13 @@ function App() {
       default:
         if (key >= "0" && key <= "9") {
           handleButtonClick(key);
-        } else if (key === ".") {
-          handleButtonClick(".");
         } else if (
           key === "+" ||
           key === "-" ||
           key === "*" ||
           key === "/" ||
-          key === "^"
+          key === "^" ||
+          key === "."
         ) {
           handleButtonClick(
             {
@@ -278,6 +343,7 @@ function App() {
               "*": "×",
               "/": "÷",
               "^": "**",
+              ".": ".",
             }[key]
           );
         }
@@ -305,12 +371,34 @@ function App() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-  const handleIconClick = () => {
-    setShowHistory((prevState) => !prevState);
+
+  const renderInputWithClosingBrackets = () => {
+    let displayValue = "";
+    let unmatchedBrackets = 0;
+
+    for (let char of inputValue) {
+      if (char === "(") {
+        displayValue += char;
+        unmatchedBrackets++;
+      } else if (char === ")" && unmatchedBrackets > 0) {
+        displayValue += char;
+        unmatchedBrackets--;
+      } else {
+        displayValue += char;
+      }
+    }
+
+    if (unmatchedBrackets > 0) {
+      displayValue += `<span style="color: gray;">${")".repeat(
+        unmatchedBrackets
+      )}</span>`;
+    }
+
+    return displayValue;
   };
 
-  const handleSearchChange = (e) => {
-    setInputValue(e.target.value);
+  const handleIconClick = () => {
+    setShowHistory((prevState) => !prevState);
   };
 
   const buttons = CalcButtons(isInverseMode, isAllClearMode);
@@ -319,12 +407,6 @@ function App() {
     <div className="calculator-container">
       <div className="search-container">
         <div className="textarea-container" style={{ position: "relative" }}>
-          <textarea
-            className="search-input"
-            value={inputValue}
-            onChange={handleSearchChange}
-            readOnly
-          />
           <PiClockCounterClockwise
             className="search-icon"
             onClick={handleIconClick}
@@ -334,7 +416,7 @@ function App() {
             style={{
               position: "absolute",
               top: "10px",
-              right: 12,
+              right: 17,
               color: "gray",
               fontSize: "13px",
               whiteSpace: "pre-wrap",
@@ -345,6 +427,48 @@ function App() {
           >
             {previousInput ? previousInput + "\n" : ""}
           </div>
+          <div
+            className="search-input"
+            contentEditable
+            dangerouslySetInnerHTML={{
+              __html: renderInputWithClosingBrackets(),
+            }}
+            onInput={(e) => setInputValue(e.currentTarget.textContent)}
+          />
+
+          {powerStack.map((power, index) => (
+            <div
+              key={index}
+              className="square"
+              style={{
+                position: "absolute",
+                top: `${35 - index * 5}px`,
+                right: `${15 - index * 8}px`,
+                width: `${12 - powerStack.length * 2}px`,
+                height: `${12 - powerStack.length * 2}px`,
+                zIndex: 1200,
+              }}
+            >
+              {power}
+            </div>
+          ))}
+
+          {isPowerBoxVisible && powerStack && maxPowerLimit && (
+            <div
+              className="square"
+              style={{
+                position: "absolute",
+                top: `${35 - powerStack.length * 5}px`,
+                right: `${15 - powerStack.length * 8}px`,
+                width: `${12 - powerStack.length * 2}px`,
+                height: `${12 - powerStack.length * 2}px`,
+                zIndex: 1000,
+                border: placeholderValue ? "" : "1px solid #ccc",
+              }}
+            >
+              {placeholderValue}
+            </div>
+          )}
         </div>
       </div>
       <div className="buttons">
@@ -375,9 +499,23 @@ function App() {
           />
           <div className="history-line"></div>
           <ul className="history-lists">
-            {history.map((entry, index) => (
-              <li key={index}>{entry}</li>
-            ))}
+            {history.length > 0 ? (
+              history.map((entry, index) => {
+                const [calculation, result] = entry.split(" = ");
+                return (
+                  <li key={index}>
+                    <span className="calculation">{calculation}</span>
+                    <span className="equals"> = </span>
+                    <span className="result">{result}</span>
+                  </li>
+                );
+              })
+            ) : (
+              <div className="empty-history">
+                <p>Your calculations and results appear here so that</p>
+                <p>you can reuse them</p>
+              </div>
+            )}
           </ul>
         </div>
       )}
