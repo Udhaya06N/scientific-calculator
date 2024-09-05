@@ -62,8 +62,10 @@ function App() {
         }
       );
 
-      if (placeholderValue !== "") {
-        expression = `Math.pow(${placeholderValue}, ${expression})`;
+      if (powerStack.length > 0 && inputValue !== "") {
+        expression = powerStack.reduce((acc, power) => {
+          return `Math.pow(${acc}, ${power})`;
+        }, inputValue);
       }
 
       expression = replaceAnsInExpression(expression, storedAns);
@@ -99,12 +101,14 @@ function App() {
     } catch (error) {
       setInputValue("Error");
       setIsAllClearMode(true);
+      setPowerStack([]);
+      setPlaceholderValue("");
+      setIsPowerBoxVisible(false);
     }
   };
 
   const handleButtonClick = (buttonText) => {
     const randomValue = Math.random();
-    const lastDigit = inputValue.slice(-1);
     const lastChar = inputValue.slice(-1);
 
     let expression = replaceExpression(inputValue, isRadians, previousInput);
@@ -126,21 +130,50 @@ function App() {
         setIsInvButtonClicked(!isInvButtonClicked);
         return;
       case "CE":
-        setInputValue((prevValue) =>
-          prevValue.length > 1 ? prevValue.slice(0, -1) : "0"
-        );
+        if (powerStack.length > 0) {
+          setPowerStack((prevStack) => {
+            const updatedStack = [...prevStack];
+            const currentPlaceholder = updatedStack[updatedStack.length - 1];
+
+            if (currentPlaceholder.length > 0) {
+              updatedStack[updatedStack.length - 1] = currentPlaceholder.slice(
+                0,
+                -1
+              );
+            } else {
+              updatedStack.pop();
+            }
+
+            setIsPowerBoxVisible(updatedStack.length > 0);
+            return updatedStack;
+          });
+        } else {
+          setInputValue((prevValue) => {
+            if (prevValue === "0") return "0";
+
+            if (prevValue.length > 1) {
+              return prevValue.slice(0, -1);
+            } else {
+              return "0";
+            }
+          });
+        }
         setIsAllClearMode(false);
-        setIsPowerBoxVisible(false);
         break;
       case "AC":
+        if (previousResult) {
+          setPreviousInput(`Ans = ${previousResult}`);
+        }
         setInputValue("0");
         setPowerStack([]);
         setPlaceholderValue("");
         setIsPowerBoxVisible(false);
-        setIsAllClearMode(true);
+        setIsAllClearMode(false);
         break;
       case "Ans":
-        if (storedAns) {
+        if (isPowerBoxVisible) {
+          setPlaceholderValue((prevValue) => prevValue + buttonText);
+        } else if (storedAns) {
           if (inputValue === "0") {
             setInputValue("Ans");
           } else if (/\d|\)|!/.test(lastChar)) {
@@ -156,11 +189,17 @@ function App() {
         }
         break;
       case "(":
-        setInputValue((prevValue) => prevValue + buttonText);
-        setOpenBracketsCount((prevCount) => prevCount + 1);
+        if (isPowerBoxVisible) {
+          setPlaceholderValue((prevValue) => prevValue + buttonText);
+        } else {
+          setInputValue((prevValue) => prevValue + buttonText);
+          setOpenBracketsCount((prevCount) => prevCount + 1);
+        }
         break;
       case ")":
-        if (openBracketsCount > 0) {
+        if (isPowerBoxVisible && openBracketsCount > 0) {
+          setPlaceholderValue((prevValue) => prevValue + buttonText);
+        } else if (openBracketsCount > 0) {
           setInputValue((prevValue) => prevValue + buttonText);
         }
         break;
@@ -173,22 +212,39 @@ function App() {
       case "sin-1":
       case "cos-1":
       case "tan-1":
-        setInputValue((prevValue) =>
-          prevValue === "0"
-            ? buttonText + "("
-            : prevValue + "*" + buttonText + "("
-        );
+        if (isPowerBoxVisible) {
+          setPowerStack((prevStack) => {
+            const newStack = [...prevStack];
+            newStack[newStack.length - 1] += buttonText + "(";
+            return newStack;
+          });
+          setIsPowerBoxVisible(true);
+        } else {
+          setInputValue((prevValue) =>
+            prevValue === "0"
+              ? buttonText + "("
+              : prevValue + "*" + buttonText + "("
+          );
+        }
         setOpenBracketsCount(openBracketsCount + 1);
         setIsInvButtonClicked(false);
+        setIsInverseMode(false);
         break;
       case "π":
       case "e":
-        setInputValue((prevValue) =>
-          prevValue === "0" ? buttonText : prevValue + "*" + buttonText
-        );
+        if (isPowerBoxVisible) {
+          setPlaceholderValue(buttonText);
+        } else {
+          setInputValue((prevValue) =>
+            prevValue === "0" ? buttonText : prevValue + "*" + buttonText
+          );
+        }
+        setIsInvButtonClicked(false);
+        setIsInverseMode(false);
         break;
       case "x!":
         setInputValue((prevValue) => prevValue + "!");
+        setIsPowerBoxVisible(false);
         break;
       case "÷":
       case "×":
@@ -208,7 +264,7 @@ function App() {
         break;
       case "xy":
         if (powerStack.length < maxPowerLimit) {
-          setPowerStack([...powerStack, placeholderValue || ""]);
+          setPowerStack([...powerStack, ""]);
           setIsPowerBoxVisible(true);
           setPlaceholderValue("");
         }
@@ -224,40 +280,82 @@ function App() {
             return prevValue + "**2";
           }
         });
+        setIsInvButtonClicked(false);
+        setIsInverseMode(false);
+        setIsPowerBoxVisible(false);
         break;
       case "10x":
-        setInputValue((prevValue) => {
-          if (prevValue === "0") {
-            return "10**";
-          } else {
-            const lastNumber = prevValue.match(/(\d+(\.\d+)?)$/);
-            if (lastNumber) {
-              return (
-                prevValue.slice(0, -lastNumber[0].length) +
-                "10**" +
-                lastNumber[0]
-              );
+        if (isPowerBoxVisible) {
+          setPlaceholderValue((prevValue) => {
+            if (prevValue === "0") {
+              return "10**";
             } else {
-              return prevValue + "10**";
+              const lastNumber = prevValue.match(/(\d+(\.\d+)?)$/);
+              if (lastNumber) {
+                return (
+                  prevValue.slice(0, -lastNumber[0].length) +
+                  "10**" +
+                  lastNumber[0]
+                );
+              } else {
+                return prevValue + "10**";
+              }
             }
-          }
-        });
+          });
+        } else {
+          setInputValue((prevValue) => {
+            if (prevValue === "0") {
+              return "10**";
+            } else {
+              const lastNumber = prevValue.match(/(\d+(\.\d+)?)$/);
+              if (lastNumber) {
+                return (
+                  prevValue.slice(0, -lastNumber[0].length) +
+                  "10**" +
+                  lastNumber[0]
+                );
+              } else {
+                return prevValue + "10**";
+              }
+            }
+          });
+        }
+        setIsInverseMode(false);
         break;
       case "y√x":
-        setInputValue("√");
+        setInputValue((prevValue) => "√" + prevValue);
+        setIsInverseMode(false);
+        setIsInvButtonClicked(false);
+        setIsPowerBoxVisible(false);
         break;
       case "Rnd":
-        setInputValue(randomValue.toString());
+        if (isPowerBoxVisible) {
+          setPlaceholderValue(randomValue.toString());
+        } else {
+          setInputValue(randomValue.toString());
+        }
+        setIsInverseMode(false);
+        setIsInvButtonClicked(false);
         break;
       case "EXP":
-        if (!isNaN(lastDigit)) {
+        if (!isNaN(lastChar)) {
           setInputValue((prevValue) => prevValue + "E");
         }
+        setIsInvButtonClicked(false);
+        setIsInverseMode(false);
         break;
       case "ex":
-        setInputValue((prevValue) =>
-          prevValue === "0" ? "e**" : prevValue + "e**"
-        );
+        if (isPowerBoxVisible) {
+          setPlaceholderValue((prevValue) =>
+            prevValue === "0" ? "e**" : prevValue + "e**"
+          );
+        } else {
+          setInputValue((prevValue) =>
+            prevValue === "0" ? "e**" : prevValue + "*e**"
+          );
+        }
+        setIsInvButtonClicked(false);
+        setIsInverseMode(false);
         setIsAllClearMode(false);
         break;
       case "=":
@@ -276,7 +374,11 @@ function App() {
         }
 
         if (isPowerBoxVisible) {
-          setPlaceholderValue((prevValue) => prevValue + buttonText);
+          setPowerStack((prevStack) => {
+            const updatedStack = [...prevStack];
+            updatedStack[updatedStack.length - 1] += buttonText;
+            return updatedStack;
+          });
         } else if (inputValue === "0" && !isNaN(buttonText)) {
           setInputValue(buttonText);
           setIsInvButtonClicked(false);
@@ -389,6 +491,17 @@ function App() {
       )}</span>`;
     }
 
+    if (powerStack.length > 0) {
+      displayValue += powerStack
+        .map(
+          (power, index) =>
+            `<sup style="position: relative; top: -${index * 5}px; font-size: ${
+              75 - index * 15
+            }%;">${power}</sup>`
+        )
+        .join("");
+    }
+
     return displayValue;
   };
 
@@ -431,34 +544,20 @@ function App() {
             onInput={(e) => setInputValue(e.currentTarget.textContent)}
           />
 
-          {powerStack.map((power, index) => (
-            <div
-              key={index}
-              className="square"
-              style={{
-                position: "absolute",
-                top: `${35 - index * 5}px`,
-                right: `${15 - index * 8}px`,
-                width: `${12 - powerStack.length * 2}px`,
-                height: `${12 - powerStack.length * 2}px`,
-                zIndex: 1200,
-              }}
-            >
-              {power}
-            </div>
-          ))}
-
           {isPowerBoxVisible && powerStack && maxPowerLimit && (
             <div
               className="square"
               style={{
                 position: "absolute",
-                top: `${35 - powerStack.length * 5}px`,
-                right: `${15 - powerStack.length * 8}px`,
+                top: `${40 - powerStack.length * 5}px`,
+                right: 10,
                 width: `${12 - powerStack.length * 2}px`,
                 height: `${12 - powerStack.length * 2}px`,
                 zIndex: 1000,
                 border: placeholderValue ? "" : "1px solid #ccc",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
               {placeholderValue}
