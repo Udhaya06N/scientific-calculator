@@ -172,7 +172,12 @@ function App() {
         break;
       case "Ans":
         if (isPowerBoxVisible) {
-          setPlaceholderValue((prevValue) => prevValue + buttonText);
+          setPowerStack((prevStack) => {
+            const newStack = [...prevStack];
+            newStack[newStack.length - 1] += buttonText;
+            return newStack;
+          });
+          setIsPowerBoxVisible(false);
         } else if (storedAns) {
           if (inputValue === "0") {
             setInputValue("Ans");
@@ -377,6 +382,9 @@ function App() {
           setPowerStack((prevStack) => {
             const updatedStack = [...prevStack];
             updatedStack[updatedStack.length - 1] += buttonText;
+            if (buttonText !== "") {
+              setIsPowerBoxVisible(false);
+            }
             return updatedStack;
           });
         } else if (inputValue === "0" && !isNaN(buttonText)) {
